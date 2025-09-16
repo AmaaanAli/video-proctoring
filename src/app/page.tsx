@@ -47,6 +47,7 @@ export default function InterviewPage() {
     faceDetection: false,
     objectDetection: false,
   });
+  const [initializingDetection, setInitializingDetection] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -189,6 +190,7 @@ export default function InterviewPage() {
   // Start proctoring
   const startProctoring = async () => {
     setIsProctoring(true);
+    setInitializingDetection(true);
     startTimeRef.current = new Date();
     setEvents([]);
     setIntegrityScore(100);
@@ -206,17 +208,14 @@ export default function InterviewPage() {
         faceDetection: true,
         objectDetection: true,
       });
-
-      // Add a small delay to ensure video is fully ready
-      setTimeout(() => {
-        console.log("Starting detection after delay...");
-      }, 1000);
     } catch (error) {
       console.error("Error initializing AI models:", error);
       setDetectionStatus({
         faceDetection: false,
         objectDetection: false,
       });
+    } finally {
+      setInitializingDetection(false);
     }
   };
 
@@ -370,6 +369,10 @@ export default function InterviewPage() {
     }
   };
 
+  const Spinner = () => (
+    <span className="inline-block h-4 w-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
@@ -428,6 +431,22 @@ export default function InterviewPage() {
                       </div>
                     </div>
                   )}
+
+                  {isProctoring && initializingDetection && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <div className="text-white text-center space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <Spinner />
+                          <span className="text-sm">
+                            Initializing AI models…
+                          </span>
+                        </div>
+                        <p className="text-xs opacity-75">
+                          Preparing face and object detection
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex gap-3">
@@ -468,49 +487,20 @@ export default function InterviewPage() {
                   <div className="mt-4 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <p className="text-sm text-gray-600">
-                          Interview Duration
-                        </p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {formatDuration(interviewDuration)}
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm text-gray-600">Integrity Score</p>
-                        <div className="flex items-center justify-center gap-2">
-                          <Progress value={integrityScore} className="w-20" />
-                          <span
-                            className={`text-2xl font-bold ${
-                              integrityScore >= 80
-                                ? "text-green-600"
-                                : integrityScore >= 60
-                                ? "text-yellow-600"
-                                : "text-red-600"
-                            }`}
-                          >
-                            {integrityScore}%
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {events.length} event{events.length !== 1 ? "s" : ""}{" "}
-                          detected
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* AI Detection Status */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center">
                         <p className="text-sm text-gray-600">Face Detection</p>
                         <div className="flex items-center justify-center gap-2">
                           {detectionStatus.faceDetection ? (
                             <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : initializingDetection ? (
+                            <Spinner />
                           ) : (
                             <XCircle className="h-5 w-5 text-red-500" />
                           )}
                           <span className="text-sm font-medium">
                             {detectionStatus.faceDetection
                               ? "Active"
+                              : initializingDetection
+                              ? "Initializing…"
                               : "Inactive"}
                           </span>
                         </div>
@@ -522,12 +512,16 @@ export default function InterviewPage() {
                         <div className="flex items-center justify-center gap-2">
                           {detectionStatus.objectDetection ? (
                             <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : initializingDetection ? (
+                            <Spinner />
                           ) : (
                             <XCircle className="h-5 w-5 text-red-500" />
                           )}
                           <span className="text-sm font-medium">
                             {detectionStatus.objectDetection
                               ? "Active"
+                              : initializingDetection
+                              ? "Initializing…"
                               : "Inactive"}
                           </span>
                         </div>
