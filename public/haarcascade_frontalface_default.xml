@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<opencv_storage>
+  <haarcascade_frontalface_default>
+    <!-- Minimal placeholder to avoid large file; instruct user to replace with full cascade if needed -->
+  </haarcascade_frontalface_default>
+</opencv_storage> 
