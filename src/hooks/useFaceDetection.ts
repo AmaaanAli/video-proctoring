@@ -7,6 +7,8 @@ import * as FaceMeshModule from "@mediapipe/face_mesh";
 import * as CameraModule from "@mediapipe/camera_utils";
 import { DETECTION_CONFIG } from "@/config/constants";
 
+const DRAW_DEBUG_LANDMARKS = false;
+
 interface FaceDetectionResult {
   hasFace: boolean;
   faceCount: number;
@@ -181,25 +183,12 @@ export const useFaceDetection = ({
           ? results.multiFaceLandmarks.length
           : 0;
 
-        // Face count diagnostics (real model)
-        if (!hasFace) {
-          console.log("FaceMesh: No face detected in frame");
-        } else if (faceCount === 1) {
-          console.log("FaceMesh: One face detected");
-        } else if (faceCount === 2) {
-          console.log("FaceMesh: Two faces detected");
-        } else if (faceCount > 2) {
-          console.log(`FaceMesh: ${faceCount} faces detected`);
-        }
-
-        // When any face is present, refresh the last-seen timer immediately
         if (hasFace) {
           lastFaceTimeRef.current = Date.now();
         }
 
-        // Check for multiple faces
+        // Multiple faces
         if (faceCount > 1) {
-          console.log("Multiple faces detected, calling onFaceDetection");
           onFaceDetection({
             hasFace: true,
             faceCount,
@@ -209,18 +198,10 @@ export const useFaceDetection = ({
           return;
         }
 
-        // Check for face absence
+        // Face absent
         if (!hasFace) {
           const now = Date.now();
-          console.log(
-            `Face absent - time since last face: ${
-              now - lastFaceTimeRef.current
-            }ms, threshold: ${faceAbsentThreshold}ms`
-          );
           if (now - lastFaceTimeRef.current > faceAbsentThreshold) {
-            console.log(
-              "Face absent threshold exceeded, calling onFaceDetection"
-            );
             onFaceDetection({
               hasFace: false,
               faceCount: 0,
@@ -229,18 +210,22 @@ export const useFaceDetection = ({
           }
         }
 
-        // Looking away detection disabled (timer refresh only)
-        if (
-          hasFace &&
-          results.multiFaceLandmarks &&
-          results.multiFaceLandmarks.length > 0
-        ) {
-          lastLookingAwayTimeRef.current = Date.now();
-        }
-
-        // Draw landmarks on canvas for debugging
-        if (canvasRef.current && results.multiFaceLandmarks) {
-          drawLandmarks(canvasRef.current, results.multiFaceLandmarks);
+        // Clear or draw canvas
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext("2d");
+          if (ctx && videoRef.current) {
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            ctx.clearRect(
+              0,
+              0,
+              canvasRef.current.width,
+              canvasRef.current.height
+            );
+            if (DRAW_DEBUG_LANDMARKS && results.multiFaceLandmarks) {
+              drawLandmarks(canvasRef.current, results.multiFaceLandmarks);
+            }
+          }
         }
       });
 
@@ -256,126 +241,65 @@ export const useFaceDetection = ({
         private callback: any = null;
         private isRunning = false;
 
-        constructor(options: any) {
-          console.log("Mock FaceMesh created as fallback");
-        }
-
-        setOptions(options: any) {
-          console.log("Mock setOptions called");
-        }
-
+        constructor(options: any) {}
+        setOptions(options: any) {}
         onResults(callback: any) {
-          console.log("Mock onResults called");
           this.callback = callback;
         }
-
-        send(data: any) {
+        send() {
           if (!this.isRunning) {
             this.isRunning = true;
             this.startMockDetection();
           }
         }
-
         private startMockDetection() {
           const simulateDetection = () => {
             if (!this.callback) return;
-
-            // Simulate realistic face detection behavior
             const time = Date.now();
-            const cycleTime = 120000; // 2 minute cycle
+            const cycleTime = 120000;
             const cyclePosition = (time % cycleTime) / cycleTime;
-
             let results: any;
-
             if (cyclePosition < 0.95) {
               results = {
                 multiFaceLandmarks: [
                   Array.from({ length: 468 }, (_, i) => ({
-                    x: 0.5 + Math.sin(i * 0.1) * 0.05,
-                    y: 0.5 + Math.cos(i * 0.1) * 0.05,
+                    x: 0.5,
+                    y: 0.5,
                     z: 0,
                   })),
                 ],
               };
             } else if (cyclePosition < 0.98) {
               results = { multiFaceLandmarks: [] };
-            } else if (cyclePosition < 0.995) {
-              results = {
-                multiFaceLandmarks: [
-                  Array.from({ length: 468 }, (_, i) => ({
-                    x: 0.2 + Math.sin(i * 0.1) * 0.05,
-                    y: 0.5 + Math.cos(i * 0.1) * 0.05,
-                    z: 0,
-                  })),
-                ],
-              };
             } else {
               results = {
                 multiFaceLandmarks: [
-                  Array.from({ length: 468 }, (_, i) => ({
-                    x: 0.3 + Math.sin(i * 0.1) * 0.05,
-                    y: 0.5 + Math.cos(i * 0.1) * 0.05,
-                    z: 0,
-                  })),
-                  Array.from({ length: 468 }, (_, i) => ({
-                    x: 0.7 + Math.sin(i * 0.1) * 0.05,
-                    y: 0.5 + Math.cos(i * 0.1) * 0.05,
-                    z: 0,
-                  })),
+                  Array.from({ length: 468 }, () => ({ x: 0.3, y: 0.5, z: 0 })),
+                  Array.from({ length: 468 }, () => ({ x: 0.7, y: 0.5, z: 0 })),
                 ],
               };
             }
-
-            if (cyclePosition >= 0.95) {
-              console.log(
-                `Mock face detection scenario at ${Math.round(
-                  cyclePosition * 100
-                )}% of cycle:`,
-                results
-              );
-            }
-
             this.callback(results);
-
             if (this.isRunning) {
               setTimeout(simulateDetection, 2000);
             }
           };
-
           simulateDetection();
         }
-
         close() {
-          console.log("Mock close called");
           this.isRunning = false;
         }
       };
 
-      const mockFaceMesh = new MockFaceMesh({
-        locateFile: (file: string) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-        },
-      });
-
-      mockFaceMesh.setOptions({
-        maxNumFaces: 2,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
+      const mockFaceMesh = new MockFaceMesh({});
+      mockFaceMesh.setOptions({});
       mockFaceMesh.onResults((results: any) => {
-        if (!isActive || !isModelReadyRef.current) {
-          return;
-        }
-
+        if (!isActive || !isModelReadyRef.current) return;
         const hasFace =
           results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0;
         const faceCount = results.multiFaceLandmarks
           ? results.multiFaceLandmarks.length
           : 0;
-
-        // Check for multiple faces
         if (faceCount > 1) {
           onFaceDetection({
             hasFace: true,
@@ -385,8 +309,6 @@ export const useFaceDetection = ({
           });
           return;
         }
-
-        // Check for face absence
         if (!hasFace) {
           const now = Date.now();
           if (now - lastFaceTimeRef.current > faceAbsentThreshold) {
@@ -399,10 +321,21 @@ export const useFaceDetection = ({
         } else {
           lastFaceTimeRef.current = Date.now();
         }
-
-        // Draw landmarks on canvas for debugging
-        if (canvasRef.current && results.multiFaceLandmarks) {
-          drawLandmarks(canvasRef.current, results.multiFaceLandmarks);
+        if (canvasRef.current && videoRef.current) {
+          const ctx = canvasRef.current.getContext("2d");
+          if (ctx) {
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            ctx.clearRect(
+              0,
+              0,
+              canvasRef.current.width,
+              canvasRef.current.height
+            );
+            if (DRAW_DEBUG_LANDMARKS && results.multiFaceLandmarks) {
+              drawLandmarks(canvasRef.current, results.multiFaceLandmarks);
+            }
+          }
         }
       });
 
@@ -410,7 +343,7 @@ export const useFaceDetection = ({
       isModelReadyRef.current = true;
       console.log("Mock FaceMesh fallback initialization completed");
     }
-  }, [canvasRef, onFaceDetection, isActive, drawLandmarks]);
+  }, [canvasRef, onFaceDetection, isActive, drawLandmarks, videoRef]);
 
   // Start face detection with existing video stream
   const startDetection = useCallback(async () => {
@@ -454,33 +387,18 @@ export const useFaceDetection = ({
 
   // Initialize when active
   useEffect(() => {
-    console.log(
-      "Face detection useEffect - isActive:",
-      isActive,
-      "videoRef:",
-      !!videoRef.current
-    );
     if (isActive) {
       initializeFaceMesh()
         .then(() => {
-          console.log(
-            "Face mesh initialized, waiting before starting detection..."
-          );
-          // Add delay to ensure everything is ready and prevent immediate false detections
           setTimeout(() => {
             if (
               faceMeshRef.current &&
               videoRef.current &&
               isModelReadyRef.current
             ) {
-              console.log("Starting face detection after delay...");
               startDetection();
-            } else {
-              console.log(
-                "Cannot start detection - missing faceMesh, video, or model not ready"
-              );
             }
-          }, 3000); // 3 second delay
+          }, 1000);
         })
         .catch((error) => {
           console.error("Failed to initialize face mesh:", error);
@@ -496,7 +414,7 @@ export const useFaceDetection = ({
         faceMeshRef.current = null;
       }
     };
-  }, [isActive, initializeFaceMesh, startDetection, stopDetection]);
+  }, [isActive, initializeFaceMesh, startDetection, stopDetection, videoRef]);
 
   return {
     initializeFaceMesh,
